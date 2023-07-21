@@ -1,0 +1,63 @@
+from netmiko import ConnectHandler
+from getpass import getpass
+from netmiko.exceptions import NetmikoTimeoutException
+from netmiko.exceptions import NetmikoAuthenticationException
+from paramiko.ssh_exception import SSHException
+from paramiko.ssh_exception import AuthenticationException
+import datetime
+import time
+import schedule
+
+password = getpass("Enter device password:")
+
+def BACKUP():
+	TNOW = datetime.datetime.now().replace(microsecond=0)
+	
+	with open('device_ips') as DEVICE_IP:
+
+		for IP in DEVICE_IP:
+			
+			RTR = {
+				'device_type': 'cisco_ios',
+				'host': IP,
+				'username': 'anwea',
+				'password': password,
+				}
+
+			print('######Connecting to the device ' + IP)
+			try:
+				net_connect = ConnectHandler(**RTR)
+				net_connect.enable()
+			except NetmikoTimeoutException:
+				print('Device not reachable')
+				continue
+			except NetmikoAuthenticationException:
+				print('Authentication Failed')
+				continue
+			except SSHException:
+				print('Error reading SSH protocol banner')
+				continue
+			except AuthenticationException:
+				print('Failed Authentication Exception')
+				continue
+			output = net_connect.send_config_from_file(config_file = 'config_command')
+			
+			print('\nsaving the configuration##########\n')
+			output = net_connect.save_config()
+			output = net_connect.send_command('sh run')
+			time.sleep(2)
+							
+			print('...Initializing backup at ' + str(TNOW))
+			time.sleep(2)
+
+			backup = open('BACKUP_' + IP + '_' + str(TNOW), 'w')
+			backup.write(output)
+			backup.close
+			print('Finished backup!\n')
+
+
+schedule.every(1).minutes.do(BACKUP)
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)
